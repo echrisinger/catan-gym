@@ -83,4 +83,30 @@ class Player:
 
     def execute_action(self):
         pass
-    
+
+    def plan_trades(self) -> List["TradeOffer"]:
+        return []
+
+    def offer_trades(self, offers: List["TradeOffer"]) -> List["TradeOffer"]:
+        for player in self.other_players:
+            player.receive_trade_offers(offers)
+
+    def receive_trade_offers(self, offers: List["TradeOffer"]) -> "TradeOffer":
+        for offer in offers:
+            if self.prompt_model_for_trade_policy(offer):
+                offer.inactive_players_agreed.append(self)
+
+    def prompt_model_for_trade_policy(self, _: "TradeOffer") -> bool:
+        """TODO -- need to implement trade policy"""
+        return False
+
+    def execute_trade(self, active_hand: DevCardHand, inactive_hand: DevCardHand):
+        pass
+
+@dataclass
+class TradeOffer:
+    active_hand: DevCardHand
+    inactive_hand: DevCardHand
+
+    active_player_agreed: bool = False
+    inactive_players_agreed: List[Player] = field(default_factory=list)
