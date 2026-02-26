@@ -1,5 +1,9 @@
+from catan import Game
+
 def main():
-    print("Hello from catan-gym!")
+    game = Game()
+    while not game.is_won():
+        game.next_turn()
 
 
 if __name__ == "__main__":

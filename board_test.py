@@ -1,6 +1,6 @@
 import pytest
 
-from catan_types import (
+from catan import (
     Board, HexType, HexPosition, PortType, BoardPoint,
     ResourceHex, DesertHex,
 )

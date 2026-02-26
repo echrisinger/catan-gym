@@ -1,143 +1,10 @@
-from enum import StrEnum
-from typing import Set, List, DefaultDict
+from typing import List, Set
 from dataclasses import dataclass
 from random import shuffle
-from abc import ABC
 
-class ResourceType(StrEnum):
-    WOOD = 'Wood'
-    BRICK = 'Brick'
-    WHEAT = 'Wheat'
-    ORE = 'Ore'
-    SHEEP = 'Sheep'
-
-class DevCardType(StrEnum):
-    KNIGHT = 'Knight'
-    YEAR_OF_PLENTY = 'Year of Plenty'
-    MONOPOLY = 'Monopoly'
-    ROAD_BUILDING = 'Road Building'
-    VICTORY_POINT = '+1 VP'
-
-class HexType(StrEnum):
-    WOOD = 'Wood'
-    BRICK = 'Brick'
-    WHEAT = 'Wheat'
-    ORE = 'Ore'
-    SHEEP = 'Sheep'
-    DESERT = 'Desert'
-
-class PortType(StrEnum):
-    WOOD = 'Wood'
-    BRICK = 'Brick'
-    WHEAT = 'Wheat'
-    ORE = 'Ore'
-    SHEEP = 'Sheep'
-    ANY = 'Any'
-
-class PlayerColor(StrEnum):
-    RED = 'Red'
-    BLUE = 'Blue'
-    ORANGE = 'White'
-    GREEN = 'Green'
-
-@dataclass(frozen=True)
-class HexPosition:
-    """
-    Hex positions are identified by floats (1.5, 3.5, 5.5) as the row (as they're vertically between hash marks)
-    Not the best way to identify an object, and we could just double the vertical axis, but this is probably
-    conceptually easier to understand, so the board points don't have to be incremented by 2.
-    """
-    row: float
-    col: int
-
-
-class Hex(ABC):
-    def __init__(self, position: HexPosition, hex_type: HexType):
-        self.position = position
-        self.hex_type = hex_type
-        self.is_blocked = False
-
-    def set_blocked(self, is_blocked: bool):
-        if self.is_blocked:
-            raise RuntimeError('Cannot block an already blocked hex')
-        self.is_blocked = is_blocked
-
-class ResourceHex(Hex):
-    def __init__(self, position: HexPosition, hex_type: HexType, dice_roll: int):
-        super().__init__(position, hex_type)
-        self.dice_roll = dice_roll
-
-class DesertHex(Hex):
-    def __init__(self, position: HexPosition):
-        super().__init__(position, HexType.DESERT)
-        self.is_blocked = True
-
-@dataclass
-class HexFactory:
-    _position: HexPosition
-    _hex_type: HexType
-    _dice_roll: int
-
-    def __init__(self):
-        pass
-
-    def position(self, position: HexPosition):
-        self._position = position
-
-        return self
-
-    def hex_type(self, hex_type: HexType):
-        self._hex_type = hex_type
-
-        return self
-
-    def dice_roll(self, dice_roll: int):
-        self._dice_roll = dice_roll
-
-        return self
-
-    def build(self) -> Hex:
-        if self._hex_type == HexType.DESERT:
-            return DesertHex(self._position)
-        else:
-            return ResourceHex(self._position, self._hex_type, self._dice_roll)
-
-@dataclass
-class BoardPoint:
-    """
-    positionally from the left or top of the board, assuming it is a square drawn around the edges of the board
-    there are 11 discrete spots a board point can be positioned vertically or horizontally
-    -----------
-       . . .
-      . . . .
-      . . . .
-     . . . . .
-     . . . . .
-    . . . . . .
-    . . . . . .
-     . . . . .
-     . . . . .
-      . . . .
-      . . . .
-       . . .
-    """
-
-    row: int
-    col: int
-
-    color: PlayerColor = None
-
-    def is_neighbor(self, other: "BoardPoint") -> bool:
-        return max(
-            abs(self.row - other.row),
-            abs(self.col - other.col)
-        ) <= 1
-
-    def settle(self, color: PlayerColor):
-        if self.color is not None:
-            raise RuntimeError('Board point is already occupied')
-
-        self.color = color
+from catan.board_point import BoardPoint
+from catan.enums import HexType, PortType, PlayerColor
+from catan.hex import Hex, HexPosition, HexFactory
 
 PORT_AMOUNTS = (
     [PortType.ANY] * 4 +
@@ -178,14 +45,13 @@ DICE_TOKEN_SEQUENCE = [
 
 class DiceTokenStack:
     def __init__(self):
-        self.counter = 0
+        self.stack = DICE_TOKEN_SEQUENCE.copy()
 
     def get_token(self, hex_type: HexType) -> int:
         dice_roll = None
 
         if hex_type != HexType.DESERT:
-            dice_roll = DICE_TOKEN_SEQUENCE[self.counter]
-            self.counter += 1
+            dice_roll = self.stack.pop()
 
         return dice_roll
 
@@ -213,17 +79,6 @@ class Road:
 
         self.color = color
 
-class Player:
-    def __init__(self, color: PlayerColor):
-        self.color = color
-
-        self.resource_cards: DefaultDict[ResourceType, int] = DefaultDict()
-        self.development_cards: DefaultDict[DevCardType, int] = DefaultDict()
-
-        self.cities = 5
-        self.settlements = 5
-        self.roads = 20
-
 @dataclass
 class Port:
     point1: BoardPoint
@@ -235,19 +90,20 @@ class Board:
     def __init__(self, hex_order: List[HexType], port_order: List[PortType]):
         self.hexes = self._build_hexes(hex_order)
         self.ports = self._build_ports(port_order)
+        self.board_points = self._build_board_points()
 
     @staticmethod
-    def _build_board_points() -> List[BoardPoint]:
+    def _build_board_points() -> Set[BoardPoint]:
         res = []
         for row in range(0, 12):
             if row in {0, 11}:
-                res += [BoardPoint(row, 3), BoardPoint(row, 5), BoardPoint(row, 7)]
+                res += {BoardPoint(row, 3), BoardPoint(row, 5), BoardPoint(row, 7)}
             elif row in {1, 2, 9, 10}:
-                res += [BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8)]
+                res += {BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8)}
             elif row in {3, 4, 7, 8}:
-                res += [BoardPoint(row, 1), BoardPoint(row, 3), BoardPoint(row, 5), BoardPoint(row, 7), BoardPoint(row, 9)]
+                res += {BoardPoint(row, 1), BoardPoint(row, 3), BoardPoint(row, 5), BoardPoint(row, 7), BoardPoint(row, 9)}
             else:
-                res += [BoardPoint(row, 0), BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8), BoardPoint(row, 10)]
+                res += {BoardPoint(row, 0), BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8), BoardPoint(row, 10)}
 
         return res
 
