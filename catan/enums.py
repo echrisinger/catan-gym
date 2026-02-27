@@ -39,3 +39,9 @@ class PlayerColor(StrEnum):
 class BuildingType(StrEnum):
     SETTLEMENT = 'Settlement'
     CITY = 'City'
+
+class Action(StrEnum):
+    BUILD_CITY = 'City'
+    BUILD_SETTLEMENT = 'Settlement'
+    BUILD_DEV_CARD = 'Dev Card'
+    BUILD_ROAD = 'Road'

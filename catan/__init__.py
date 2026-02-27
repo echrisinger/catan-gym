@@ -1,4 +1,4 @@
-from catan.enums import ResourceType, DevCardType, HexType, PortType, PlayerColor
+from catan.enums import Action, ResourceType, DevCardType, HexType, PortType, PlayerColor
 from catan.hex import HexPosition, Hex, ResourceHex, DesertHex, HexFactory
 from catan.board import (
     Port, Road, Board,

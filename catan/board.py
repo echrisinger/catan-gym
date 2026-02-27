@@ -5,6 +5,7 @@ from random import shuffle
 from catan.board_point import BoardPoint
 from catan.enums import HexType, PortType, PlayerColor
 from catan.hex import Hex, HexPosition, HexFactory
+from shuffle import copy_and_shuffle
 
 PORT_AMOUNTS = (
     [PortType.ANY] * 4 +
@@ -55,17 +56,11 @@ class DiceTokenStack:
 
         return dice_roll
 
-
-def _copy_and_shuffle[T](l: List[T]) -> List[T]:
-    res = l.copy()
-    shuffle(res)
-    return res
-
 def shuffle_hexes() -> List[HexType]:
-    return _copy_and_shuffle(HEX_AMOUNTS)
+    return copy_and_shuffle(HEX_AMOUNTS)
 
 def shuffle_ports() -> List[PortType]:
-    return _copy_and_shuffle(PORT_AMOUNTS)
+    return copy_and_shuffle(PORT_AMOUNTS)
 
 class Road:
     def __init__(self, point1: BoardPoint, point2: BoardPoint):
