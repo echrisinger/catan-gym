@@ -1,4 +1,4 @@
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Optional
 from dataclasses import dataclass
 
 from catan.board_point import BoardPoint
@@ -15,16 +15,20 @@ PORT_AMOUNTS = (
     [PortType.SHEEP]
 )
 
+class Position(NamedTuple):
+    row: int
+    col: int
+
 PORT_POSITIONS = [
-    (BoardPoint(1, 2), BoardPoint(0, 3)),
-    (BoardPoint(0, 5), BoardPoint(1, 6)),
-    (BoardPoint(3, 1), BoardPoint(4, 1)),
-    (BoardPoint(2, 8), BoardPoint(3, 9)),
-    (BoardPoint(5, 10), BoardPoint(6, 10)),
-    (BoardPoint(7, 1), BoardPoint(8, 1)),
-    (BoardPoint(8, 9), BoardPoint(9, 8)),
-    (BoardPoint(10, 2), BoardPoint(11, 3)),
-    (BoardPoint(11, 5), BoardPoint(12, 6))
+    (Position(1, 2), Position(0, 3)),
+    (Position(0, 5), Position(1, 6)),
+    (Position(3, 1), Position(4, 1)),
+    (Position(2, 8), Position(3, 9)),
+    (Position(5, 10), Position(6, 10)),
+    (Position(7, 1), Position(8, 1)),
+    (Position(8, 9), Position(9, 8)),
+    (Position(10, 2), Position(11, 3)),
+    (Position(11, 5), Position(12, 6))
 ]
 
 HEX_AMOUNTS = (
@@ -61,10 +65,6 @@ def shuffle_hexes() -> List[HexType]:
 def shuffle_ports() -> List[PortType]:
     return copy_and_shuffle(PORT_AMOUNTS)
 
-class Position(NamedTuple):
-    row: int
-    col: int
-
 @dataclass
 class Road:
     point1: BoardPoint
@@ -91,12 +91,18 @@ class Port:
 
     resource: PortType
 
+    def is_settled(self) -> bool:
+        return self.point1.color is not None or self.point2.color is not None
+
+    def color(self) -> PlayerColor | None:
+        return self.point1.color or self.point2.color
+
 class Board:
     def __init__(self, hex_order: List[HexType], port_order: List[PortType]):
         self.hexes = self._build_hexes(hex_order)
-        self.ports = self._build_ports(port_order)
         self.board_points = self._build_board_points()
         self.roads = self._build_roads()
+        self.ports = self._build_ports(port_order)
 
     @staticmethod
     def _build_board_points() -> dict[Position, BoardPoint]:
@@ -118,9 +124,8 @@ class Board:
         return board_points
 
     @staticmethod
-    def _road_key(p1: BoardPoint, p2: BoardPoint) -> tuple[Position, Position]:
-        a, b = Position(p1.row, p1.col), Position(p2.row, p2.col)
-        return (min(a, b), max(a, b))
+    def _position_pair(p1: Position, p2: Position) -> tuple[Position, Position]:
+        return (min(p1, p2), max(p1, p2))
 
     def _build_roads(self) -> dict[tuple[Position, Position], Road]:
         """
@@ -128,34 +133,38 @@ class Board:
         :return:
         """
         roads = {}
-        for point in self.board_points.values():
+        for pos, point in self.board_points.items():
             if point.is_ascending():
                 if not point.is_right_edge():
-                    next_point = self.board_points[Position(point.row - 1, point.col + 1)]
+                    next_pos = Position(point.row - 1, point.col + 1)
+                    next_point = self.board_points[next_pos]
                     road = Road(point, next_point)
-                    roads[self._road_key(point, next_point)] = road
+                    roads[self._position_pair(pos, next_pos)] = road
 
                 if not point.is_bottom_edge():
-                    next_point = self.board_points[Position(point.row + 1, point.col)]
+                    next_pos = Position(point.row + 1, point.col)
+                    next_point = self.board_points[next_pos]
                     road = Road(point, next_point)
-                    roads[self._road_key(point, next_point)] = road
+                    roads[self._position_pair(pos, next_pos)] = road
             elif point.is_descending() and not point.is_right_edge():
-                next_point = self.board_points[Position(point.row + 1, point.col + 1)]
+                next_pos = Position(point.row + 1, point.col + 1)
+                next_point = self.board_points[next_pos]
                 road = Road(point, next_point)
-                roads[self._road_key(point, next_point)] = road
+                roads[self._position_pair(pos, next_pos)] = road
 
         return roads
 
 
-    @staticmethod
-    def _build_ports(port_order: List[PortType]) -> List[Port]:
+    def _build_ports(self, port_order: List[PortType]) -> dict[tuple[Position, Position], Port]:
         if len(port_order) != len(PORT_POSITIONS):
             raise RuntimeError('Cannot construct board with number of ports: %s, versus port positions: %s'.format(len(port_order), len(PORT_POSITIONS)))
 
-        return [
-            Port(port[0], port[1], port_order[i])
-            for i, port in enumerate(PORT_POSITIONS)
-        ]
+        ports = dict()
+        for i, (p1, p2) in enumerate(PORT_POSITIONS):
+            position = self._position_pair(p1, p2)
+            ports[position] = Port(self.board_points[p1], self.board_points[p2], port_order[i])
+
+        return ports
 
     @staticmethod
     def _build_hexes(hex_order: List[HexType]) -> List[Hex]:
