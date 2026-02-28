@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, List
 
-from catan import Board, DevCardType
+from catan import Board
 from catan.bank import Bank
 from catan.board_point import BoardPoint
 from catan.enums import Action, PlayerColor, BuildingType
@@ -59,7 +59,7 @@ class Player:
     def has_road_spot(self) -> bool:
         return False
 
-    def place_road(self) -> bool:
+    def place_road(self):
         self.resource_cards.wood -= 1
         self.resource_cards.brick -= 1
 

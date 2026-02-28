@@ -62,11 +62,12 @@ def shuffle_hexes() -> List[HexType]:
 def shuffle_ports() -> List[PortType]:
     return copy_and_shuffle(PORT_AMOUNTS)
 
+@dataclass
 class Road:
-    def __init__(self, point1: BoardPoint, point2: BoardPoint):
-        self.color = None
-        self.point1 = point1
-        self.point2 = point2
+    point1: BoardPoint
+    point2: BoardPoint
+
+    color: PlayerColor = None
 
     def build(self, color: PlayerColor):
         if self.color is not None:
@@ -86,6 +87,7 @@ class Board:
         self.hexes = self._build_hexes(hex_order)
         self.ports = self._build_ports(port_order)
         self.board_points = self._build_board_points()
+        self.roads = self._build_roads(self.hexes, self.board_points)
 
     @staticmethod
     def _build_board_points() -> Set[BoardPoint]:
@@ -101,6 +103,21 @@ class Board:
                 res += {BoardPoint(row, 0), BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8), BoardPoint(row, 10)}
 
         return res
+
+    def _build_roads(self) -> set[Road]:
+        """
+        builds roads from top/left of the board down & to the right.
+        :return:
+        """
+        pass
+        # for point in self.board_points:
+        #     if point.is_ascending() and not point.is_right_edge():
+        #         next_point = BoardPoint(point.row - 1, point.col + 1)
+        #         next_point = self.board_points[]
+        #         right = Road(point, )
+        #
+        #
+        #         right = Road()
 
 
     @staticmethod
