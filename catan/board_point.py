@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from catan import PlayerColor
 from catan.enums import BuildingType
 
-
 @dataclass
 class BoardPoint:
     """
@@ -23,6 +22,8 @@ class BoardPoint:
       . . . .
        . . .
     """
+    ROW_SIZE = 12
+    COL_SIZE = 11
 
     row: int
     col: int
@@ -31,7 +32,10 @@ class BoardPoint:
     building: BuildingType = None
 
     def __hash__(self):
-        return hash(self.row * 11 + self.col)
+        return hash(self.row * self.__class__.COL_SIZE + self.col)
+
+    def __eq__(self, other):
+        return self.row == other.row and self.col == other.col
 
     def is_neighbor(self, other: "BoardPoint") -> bool:
         return max(

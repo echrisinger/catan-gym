@@ -1,7 +1,7 @@
 import pytest
 
 from catan import (
-    Board, HexType, HexPosition, PortType, BoardPoint,
+    Board, HexType, HexPosition, PortType, BoardPoint, Position,
     ResourceHex, DesertHex,
 )
 
@@ -139,3 +139,68 @@ def test_board_hexes_built_with_correct_ports(board):
         assert port.resource == port_type, (
             f"port {i}: expected {port_type}, got {port.resource}"
         )
+
+
+# -- Road tests --
+
+def test_board_adheres_to_eulers_formula(board):
+    assert len(board.board_points) - len(board.roads) + (len(board.hexes) + 1) == 2
+    assert len(board.hexes) == 19
+    assert len(board.board_points) == 54
+    assert len(board.roads) == 72
+
+
+@pytest.mark.parametrize("p1, p2", [
+    # top-left corner
+    (Position(0, 3), Position(1, 4)),   # descending right-down
+    # vertical road between rows 1-2
+    (Position(1, 2), Position(2, 2)),   # ascending down
+    # ascending right-up from widest row
+    (Position(5, 0), Position(4, 1)),
+    # descending right-down from widest row
+    (Position(6, 0), Position(7, 1)),
+    # center of board
+    (Position(5, 4), Position(6, 4)),   # ascending down
+    (Position(5, 4), Position(4, 5)),   # ascending right-up
+    (Position(6, 4), Position(7, 5)),   # descending right-down
+    # bottom-left corner
+    (Position(10, 2), Position(11, 3)), # descending right-down
+])
+def test_specific_roads_exist(board, p1, p2):
+    key = (min(p1, p2), max(p1, p2))
+    assert key in board.roads, f"road {p1}-{p2} not found"
+
+
+def test_road_key_order_is_normalized(board):
+    """Looking up a road with either endpoint order should find the same road."""
+    p1, p2 = Position(0, 3), Position(1, 4)
+    key_forward = (min(p1, p2), max(p1, p2))
+    key_reverse = (min(p2, p1), max(p2, p1))
+    assert key_forward == key_reverse
+    assert key_forward in board.roads
+
+
+def test_road_endpoints_are_board_point_instances(board):
+    """Each road's point1/point2 should be the actual BoardPoint from board_points."""
+    for (pos1, pos2), road in board.roads.items():
+        assert road.point1 is board.board_points[pos1] or road.point1 is board.board_points[pos2]
+        assert road.point2 is board.board_points[pos1] or road.point2 is board.board_points[pos2]
+
+
+@pytest.mark.parametrize("p1, p2", [
+    # right edge: ascending right-up should not exist
+    (Position(1, 8), Position(0, 9)),
+    (Position(3, 9), Position(2, 10)),
+    (Position(5, 10), Position(4, 11)),
+    # right edge: descending right-down should not exist
+    (Position(6, 10), Position(7, 11)),
+    (Position(8, 9), Position(9, 10)),
+    (Position(10, 8), Position(11, 9)),
+    # bottom edge: ascending down should not exist
+    (Position(11, 3), Position(12, 3)),
+    (Position(11, 5), Position(12, 5)),
+    (Position(11, 7), Position(12, 7)),
+])
+def test_roads_off_right_and_bottom_edges_do_not_exist(board, p1, p2):
+    key = (min(p1, p2), max(p1, p2))
+    assert key not in board.roads, f"road {p1}-{p2} should not exist"

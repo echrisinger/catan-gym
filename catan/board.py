@@ -1,6 +1,5 @@
-from typing import List, Set
+from typing import List, NamedTuple
 from dataclasses import dataclass
-from random import shuffle
 
 from catan.board_point import BoardPoint
 from catan.enums import HexType, PortType, PlayerColor
@@ -46,7 +45,7 @@ DICE_TOKEN_SEQUENCE = [
 
 class DiceTokenStack:
     def __init__(self):
-        self.stack = DICE_TOKEN_SEQUENCE.copy()
+        self.stack = DICE_TOKEN_SEQUENCE[::-1]
 
     def get_token(self, hex_type: HexType) -> int:
         dice_roll = None
@@ -62,6 +61,10 @@ def shuffle_hexes() -> List[HexType]:
 def shuffle_ports() -> List[PortType]:
     return copy_and_shuffle(PORT_AMOUNTS)
 
+class Position(NamedTuple):
+    row: int
+    col: int
+
 @dataclass
 class Road:
     point1: BoardPoint
@@ -75,6 +78,12 @@ class Road:
 
         self.color = color
 
+    def __hash__(self):
+        return self.point1.__hash__() + self.point2.__hash__() * (BoardPoint.ROW_SIZE * BoardPoint.COL_SIZE)
+
+    def __eq__(self, other):
+        return self.point1 == other.point1 and self.point2 == other.point2
+
 @dataclass
 class Port:
     point1: BoardPoint
@@ -87,37 +96,55 @@ class Board:
         self.hexes = self._build_hexes(hex_order)
         self.ports = self._build_ports(port_order)
         self.board_points = self._build_board_points()
-        self.roads = self._build_roads(self.hexes, self.board_points)
+        self.roads = self._build_roads()
 
     @staticmethod
-    def _build_board_points() -> Set[BoardPoint]:
-        res = []
+    def _build_board_points() -> dict[Position, BoardPoint]:
+        board_points = {}
+
         for row in range(0, 12):
             if row in {0, 11}:
-                res += {BoardPoint(row, 3), BoardPoint(row, 5), BoardPoint(row, 7)}
+                cols = [3, 5, 7]
             elif row in {1, 2, 9, 10}:
-                res += {BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8)}
+                cols = [2, 4, 6, 8]
             elif row in {3, 4, 7, 8}:
-                res += {BoardPoint(row, 1), BoardPoint(row, 3), BoardPoint(row, 5), BoardPoint(row, 7), BoardPoint(row, 9)}
+                cols = [1, 3, 5, 7, 9]
             else:
-                res += {BoardPoint(row, 0), BoardPoint(row, 2), BoardPoint(row, 4), BoardPoint(row, 6), BoardPoint(row, 8), BoardPoint(row, 10)}
+                cols = [0, 2, 4, 6, 8, 10]
 
-        return res
+            for col in cols:
+                board_points[Position(row, col)] = BoardPoint(row, col)
 
-    def _build_roads(self) -> set[Road]:
+        return board_points
+
+    @staticmethod
+    def _road_key(p1: BoardPoint, p2: BoardPoint) -> tuple[Position, Position]:
+        a, b = Position(p1.row, p1.col), Position(p2.row, p2.col)
+        return (min(a, b), max(a, b))
+
+    def _build_roads(self) -> dict[tuple[Position, Position], Road]:
         """
         builds roads from top/left of the board down & to the right.
         :return:
         """
-        pass
-        # for point in self.board_points:
-        #     if point.is_ascending() and not point.is_right_edge():
-        #         next_point = BoardPoint(point.row - 1, point.col + 1)
-        #         next_point = self.board_points[]
-        #         right = Road(point, )
-        #
-        #
-        #         right = Road()
+        roads = {}
+        for point in self.board_points.values():
+            if point.is_ascending():
+                if not point.is_right_edge():
+                    next_point = self.board_points[Position(point.row - 1, point.col + 1)]
+                    road = Road(point, next_point)
+                    roads[self._road_key(point, next_point)] = road
+
+                if not point.is_bottom_edge():
+                    next_point = self.board_points[Position(point.row + 1, point.col)]
+                    road = Road(point, next_point)
+                    roads[self._road_key(point, next_point)] = road
+            elif point.is_descending() and not point.is_right_edge():
+                next_point = self.board_points[Position(point.row + 1, point.col + 1)]
+                road = Road(point, next_point)
+                roads[self._road_key(point, next_point)] = road
+
+        return roads
 
 
     @staticmethod
