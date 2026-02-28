@@ -108,15 +108,15 @@ def test_desert_hex_is_blocked(board):
 # -- Port tests --
 
 EXPECTED_PORTS = [
-    (BoardPoint(1, 2),  BoardPoint(0, 3),   PortType.ANY),
-    (BoardPoint(0, 5),  BoardPoint(1, 6),   PortType.WOOD),
-    (BoardPoint(3, 1),  BoardPoint(4, 1),   PortType.BRICK),
-    (BoardPoint(2, 8),  BoardPoint(3, 9),   PortType.ANY),
-    (BoardPoint(5, 10), BoardPoint(6, 10),  PortType.ANY),
-    (BoardPoint(7, 1),  BoardPoint(8, 1),   PortType.SHEEP),
-    (BoardPoint(8, 9),  BoardPoint(9, 8),   PortType.ANY),
-    (BoardPoint(10, 2), BoardPoint(11, 3),  PortType.ORE),
-    (BoardPoint(11, 5), BoardPoint(12, 6),  PortType.WHEAT),
+    (Position(1, 2),  Position(0, 3),   PortType.ANY),
+    (Position(0, 5),  Position(1, 6),   PortType.WOOD),
+    (Position(2, 8),  Position(3, 9),   PortType.BRICK),
+    (Position(5, 10), Position(6, 10),  PortType.ANY),
+    (Position(8, 9),  Position(9, 8),   PortType.ANY),
+    (Position(11, 5), Position(10, 6),  PortType.SHEEP),
+    (Position(10, 2), Position(11, 3),  PortType.ANY),
+    (Position(7, 1),  Position(8, 1),   PortType.ORE),
+    (Position(3, 1),  Position(4, 1),   PortType.WHEAT),
 ]
 
 
@@ -124,20 +124,16 @@ def test_board_has_9_ports(board):
     assert len(board.ports) == 9
 
 
-def test_board_hexes_built_with_correct_ports(board):
-    """Each port should connect the expected pair of board points with the expected type."""
-    for i, (p1, p2, port_type) in enumerate(EXPECTED_PORTS):
-        port = board.ports[i]
-        assert port.point1 == p1, (
-            f"port {i}: expected point1 ({p1.row}, {p1.col}), "
-            f"got ({port.point1.row}, {port.point1.col})"
+def test_board_ports_built_with_correct_resources(board):
+    """Each port should be keyed by its position pair with the expected resource type."""
+    for p1, p2, port_type in EXPECTED_PORTS:
+        key = (min(p1, p2), max(p1, p2))
+        assert key in board.ports, (
+            f"port ({p1}, {p2}) not found"
         )
-        assert port.point2 == p2, (
-            f"port {i}: expected point2 ({p2.row}, {p2.col}), "
-            f"got ({port.point2.row}, {port.point2.col})"
-        )
+        port = board.ports[key]
         assert port.resource == port_type, (
-            f"port {i}: expected {port_type}, got {port.resource}"
+            f"port ({p1}, {p2}): expected {port_type}, got {port.resource}"
         )
 
 

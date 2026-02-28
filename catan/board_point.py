@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from catan import PlayerColor
+from catan.enums import PlayerColor
 from catan.enums import BuildingType
 
 @dataclass

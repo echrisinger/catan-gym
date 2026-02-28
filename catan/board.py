@@ -1,9 +1,11 @@
-from typing import List, NamedTuple, Optional
-from dataclasses import dataclass
 
 from catan.board_point import BoardPoint
-from catan.enums import HexType, PortType, PlayerColor
+from catan.dice import DiceTokenStack
+from catan.enums import HexType, PortType
 from catan.hex import Hex, HexPosition, HexFactory
+from catan.port import Port
+from catan.position import Position
+from catan.road import Road
 from shuffle import copy_and_shuffle
 
 PORT_AMOUNTS = (
@@ -15,20 +17,16 @@ PORT_AMOUNTS = (
     [PortType.SHEEP]
 )
 
-class Position(NamedTuple):
-    row: int
-    col: int
-
 PORT_POSITIONS = [
     (Position(1, 2), Position(0, 3)),
     (Position(0, 5), Position(1, 6)),
-    (Position(3, 1), Position(4, 1)),
     (Position(2, 8), Position(3, 9)),
     (Position(5, 10), Position(6, 10)),
-    (Position(7, 1), Position(8, 1)),
     (Position(8, 9), Position(9, 8)),
+    (Position(11, 5), Position(10, 6)),
     (Position(10, 2), Position(11, 3)),
-    (Position(11, 5), Position(12, 6))
+    (Position(7, 1), Position(8, 1)),
+    (Position(3, 1), Position(4, 1)),
 ]
 
 HEX_AMOUNTS = (
@@ -40,65 +38,14 @@ HEX_AMOUNTS = (
     [HexType.SHEEP] * 4
 )
 
-DICE_TOKEN_SEQUENCE = [
-    5, 2, 6, 3, 8,
-    10, 9, 12, 11,
-    4, 8, 10, 9,
-    4, 5, 6, 3, 11
-]
-
-class DiceTokenStack:
-    def __init__(self):
-        self.stack = DICE_TOKEN_SEQUENCE[::-1]
-
-    def get_token(self, hex_type: HexType) -> int:
-        dice_roll = None
-
-        if hex_type != HexType.DESERT:
-            dice_roll = self.stack.pop()
-
-        return dice_roll
-
-def shuffle_hexes() -> List[HexType]:
+def shuffle_hexes() -> list[HexType]:
     return copy_and_shuffle(HEX_AMOUNTS)
 
-def shuffle_ports() -> List[PortType]:
+def shuffle_ports() -> list[PortType]:
     return copy_and_shuffle(PORT_AMOUNTS)
 
-@dataclass
-class Road:
-    point1: BoardPoint
-    point2: BoardPoint
-
-    color: PlayerColor = None
-
-    def build(self, color: PlayerColor):
-        if self.color is not None:
-            raise RuntimeError('Road is already occupied')
-
-        self.color = color
-
-    def __hash__(self):
-        return self.point1.__hash__() + self.point2.__hash__() * (BoardPoint.ROW_SIZE * BoardPoint.COL_SIZE)
-
-    def __eq__(self, other):
-        return self.point1 == other.point1 and self.point2 == other.point2
-
-@dataclass
-class Port:
-    point1: BoardPoint
-    point2: BoardPoint
-
-    resource: PortType
-
-    def is_settled(self) -> bool:
-        return self.point1.color is not None or self.point2.color is not None
-
-    def color(self) -> PlayerColor | None:
-        return self.point1.color or self.point2.color
-
 class Board:
-    def __init__(self, hex_order: List[HexType], port_order: List[PortType]):
+    def __init__(self, hex_order: list[HexType], port_order: list[PortType]):
         self.hexes = self._build_hexes(hex_order)
         self.board_points = self._build_board_points()
         self.roads = self._build_roads()
@@ -123,10 +70,6 @@ class Board:
 
         return board_points
 
-    @staticmethod
-    def _position_pair(p1: Position, p2: Position) -> tuple[Position, Position]:
-        return (min(p1, p2), max(p1, p2))
-
     def _build_roads(self) -> dict[tuple[Position, Position], Road]:
         """
         builds roads from top/left of the board down & to the right.
@@ -139,62 +82,60 @@ class Board:
                     next_pos = Position(point.row - 1, point.col + 1)
                     next_point = self.board_points[next_pos]
                     road = Road(point, next_point)
-                    roads[self._position_pair(pos, next_pos)] = road
+                    roads[Position.pair(pos, next_pos)] = road
 
                 if not point.is_bottom_edge():
                     next_pos = Position(point.row + 1, point.col)
                     next_point = self.board_points[next_pos]
                     road = Road(point, next_point)
-                    roads[self._position_pair(pos, next_pos)] = road
+                    roads[Position.pair(pos, next_pos)] = road
             elif point.is_descending() and not point.is_right_edge():
                 next_pos = Position(point.row + 1, point.col + 1)
                 next_point = self.board_points[next_pos]
                 road = Road(point, next_point)
-                roads[self._position_pair(pos, next_pos)] = road
+                roads[Position.pair(pos, next_pos)] = road
 
         return roads
 
-
-    def _build_ports(self, port_order: List[PortType]) -> dict[tuple[Position, Position], Port]:
+    def _build_ports(self, port_order: list[PortType]) -> dict[tuple[Position, Position], Port]:
         if len(port_order) != len(PORT_POSITIONS):
-            raise RuntimeError('Cannot construct board with number of ports: %s, versus port positions: %s'.format(len(port_order), len(PORT_POSITIONS)))
+            raise RuntimeError(f"Cannot construct board with number of ports: {len(port_order)}, versus port positions: {len(PORT_POSITIONS)}")
 
-        ports = dict()
+        ports = {}
         for i, (p1, p2) in enumerate(PORT_POSITIONS):
-            position = self._position_pair(p1, p2)
-            ports[position] = Port(self.board_points[p1], self.board_points[p2], port_order[i])
+            key = Position.pair(p1, p2)
+            ports[key] = Port(self.board_points[p1], self.board_points[p2], port_order[i])
 
         return ports
 
-    @staticmethod
-    def _build_hexes(hex_order: List[HexType]) -> List[Hex]:
-        if len(hex_order) - 1 != len(DICE_TOKEN_SEQUENCE):
-            raise RuntimeError('Should have an equivalent number of dice to resource types')
+    # Hex ring traversal increments: (row, col) deltas for each side of the hexagon.
+    # Each side is traversed for `ring` steps, skipping the last tile per side
+    # (it becomes the first tile of the next side). Center is a fencepost case.
+    _HEX_SIDE_INCREMENTS = [
+        (0, 2),
+        (2, 1),
+        (2, -1),
+        (0, -2),
+        (-2, -1),
+        (-2, 1)
+    ]
 
+    @staticmethod
+    def _build_hexes(hex_order: list[HexType]) -> list[Hex]:
         ring = 2
         dice_token_stack = DiceTokenStack()
+        if len(hex_order) - 1 != dice_token_stack.size():
+            raise RuntimeError('Should have an equivalent number of dice to resource types')
+
         hex_seq_counter = 0
 
         hexes = []
         while ring > 0:
             row = 5.5 - ring * 2
             col = 5 - ring
-
-            # increments by (0, 2) going horizontally
-            # for each side length, we don't add last tile, as we assume
-            # it will be in the top next side of the board
-            # except the center (fencepost, as that would have side length of 0)
-            side_increments = [
-                (0, 2),
-                (2, 1),
-                (2, -1),
-                (0, -2),
-                (-2, -1),
-                (-2, 1)
-            ]
             curr_row = row
             curr_col = col
-            for row_increment, col_increment in side_increments:
+            for row_increment, col_increment in Board._HEX_SIDE_INCREMENTS:
                 for _ in range(ring):
                     position = HexPosition(
                         curr_row,

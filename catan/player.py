@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional, List
 
 from catan import Board
 from catan.bank import Bank
@@ -57,7 +56,8 @@ class Player:
             self.resource_cards.brick > 0
 
     def has_road_spot(self) -> bool:
-        return False
+        # need to index roads by board points
+        pass
 
     def place_road(self):
         self.resource_cards.wood -= 1
@@ -76,7 +76,10 @@ class Player:
             self.resource_cards.wheat > 0
 
     def has_settlement_spot(self) -> bool:
-        return False
+        # need to maintain a set of all settleable points
+        # which will utilize BoardPoint to Road to BoardPoint connection
+        # and union that with points roads are connected with
+        pass
 
     def has_settlement(self):
         return self.settlements != 5
@@ -124,7 +127,7 @@ class Player:
             self.execute_action(next_action)
             next_action = self.plan_next_action()
 
-    def plan_next_action(self) -> Optional[Action]:
+    def plan_next_action(self) -> Action | None:
         # TODO - need to turn this into returning dataclass w/ positions
         if self.has_city_materials() and self.has_settlement():
             return Action.BUILD_CITY

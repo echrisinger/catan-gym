@@ -1,4 +1,4 @@
-from catan import DevCardType
+from catan.enums import DevCardType
 from shuffle import copy_and_shuffle
 
 DEV_CARD_AMOUNTS = (
